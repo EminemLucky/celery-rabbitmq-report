@@ -71,22 +71,27 @@ class ContextTask(celery.Task):
 
 celery.Task = ContextTask
 
+import os
+from flask import Flask, jsonify, send_from_directory
 
 def create_app(config_override=None):
     global _flask_app
 
-    app = Flask(__name__)
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+
+    app = Flask(
+        __name__,
+        static_folder=static_dir,
+        static_url_path="/static",
+    )
     app.config.from_object("app.config.Config")
 
-    # ✅ 先覆盖配置
     if config_override:
         app.config.update(config_override)
 
-    # ✅ 加这三行：SQLite 不支持 MySQL 连接池参数
     if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
 
-    # ✅ 再 init 扩展，这时用的是覆盖后的 URI
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db)
@@ -104,15 +109,17 @@ def create_app(config_override=None):
     def handle_validation_error(err):
         return jsonify({"error": "validation failed", "detail": err.messages}), 400
 
+    @app.route("/")
+    def index():
+        return send_from_directory(static_dir, "index.html")
+
+    @app.route("/login")
+    def login_page():
+        return send_from_directory(static_dir, "login.html")
+
     @app.cli.command("init-roles")
     def init_roles_command():
-        from app.models import Role
-        for name in ("admin", "user"):
-            if not Role.query.filter_by(name=name).first():
-                db.session.add(Role(name=name))
-        db.session.commit()
-        print("roles initialized")
-
+        ...
     return app
 
 

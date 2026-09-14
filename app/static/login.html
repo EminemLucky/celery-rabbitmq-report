@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>登录 - 报告管理系统</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body class="login-page">
+  <div id="app" class="login-box">
+    <h1>可靠性报告管理系统</h1>
+
+    <div class="tabs">
+      <button :class="{active: mode==='login'}" @click="mode='login'">登录</button>
+      <button :class="{active: mode==='register'}" @click="mode='register'">注册</button>
+    </div>
+
+    <div class="form">
+      <input v-model="username" placeholder="用户名" @keyup.enter="submit" />
+      <input v-model="password" type="password" placeholder="密码" @keyup.enter="submit" />
+      <button class="primary" @click="submit" :disabled="loading">
+        {{ loading ? '处理中...' : (mode === 'login' ? '登录' : '注册') }}
+      </button>
+      <p class="error" v-if="error">{{ error }}</p>
+      <p class="tip" v-if="mode==='register'">第一个注册的用户自动成为管理员</p>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref } = Vue;
+    createApp({
+      setup() {
+        const mode = ref("login");
+        const username = ref("");
+        const password = ref("");
+        const error = ref("");
+        const loading = ref(false);
+
+        const submit = async () => {
+          error.value = "";
+          if (!username.value || !password.value) {
+            error.value = "用户名和密码不能为空";
+            return;
+          }
+          loading.value = true;
+          try {
+            const url = mode.value === "login"
+              ? "/api/auth/login"
+              : "/api/auth/register";
+            const res = await axios.post(url, {
+              username: username.value,
+              password: password.value,
+            });
+
+            if (mode.value === "register") {
+              alert("注册成功，请登录");
+              mode.value = "login";
+            } else {
+              localStorage.setItem("access_token", res.data.access_token);
+              localStorage.setItem("refresh_token", res.data.refresh_token);
+              localStorage.setItem("user", JSON.stringify(res.data.user));
+              window.location.href = "/";
+            }
+          } catch (e) {
+            error.value = e.response?.data?.error
+              || e.response?.data?.detail
+              || e.message;
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        return { mode, username, password, error, loading, submit };
+      },
+    }).mount("#app");
+  </script>
+</body>
+</html>
