@@ -1,0 +1,3 @@
+﻿SHOW TABLES;
+SELECT COUNT(*) FROM `role`;
+SHOW INDEX FROM encrypt_task;

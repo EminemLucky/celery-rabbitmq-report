@@ -1,0 +1,169 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: flask-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: reportdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: flask-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: flask-web
+    restart: unless-stopped
+    environment:
+      JWT_SECRET_KEY: super-secret-jwt-change-me
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+      MYSQL_DB: reportdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER: amqp://appuser:apppass@rabbitmq:5672//
+      CELERY_BACKEND: redis://redis:6379/1
+      AES_KEY: "0123456789abcdef0123456789abcdef"
+      AES_IV: "abcdef9876543210"
+      REPORT_DIR: /app/reports
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app:/app/app
+      - ./run.py:/app/run.py
+      - ./worker.py:/app/worker.py
+      - ./beat.py:/app/beat.py
+      - report_files:/app/reports
+      - ./migrations:/app/migrations
+    command: ["python", "run.py"]
+
+  worker:
+    build: .
+    container_name: flask-worker
+    restart: unless-stopped
+    environment:
+      JWT_SECRET_KEY: super-secret-jwt-change-me
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+      MYSQL_DB: reportdb
+      REDIS_HOST: redis
+      CELERY_BROKER: amqp://appuser:apppass@rabbitmq:5672//
+      CELERY_BACKEND: redis://redis:6379/1
+      AES_KEY: "0123456789abcdef0123456789abcdef"
+      AES_IV: "abcdef9876543210"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - report_files:/app/reports
+      - ./migrations:/app/migrations
+    command: ["celery", "-A", "app:celery", "worker", "-l", "info", "-Q", "normal,beat,high", "--concurrency=2"]
+
+  beat:
+    build: .
+    container_name: flask-beat
+    restart: unless-stopped
+    environment:
+      JWT_SECRET_KEY: super-secret-jwt-change-me
+      REDIS_HOST: redis
+      CELERY_BROKER: amqp://appuser:apppass@rabbitmq:5672//
+      CELERY_BACKEND: redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./migrations:/app/migrations
+    command: ["celery", "-A", "app:celery", "beat", "-l", "info"]
+
+  flower:
+    build: .
+    container_name: flask-flower
+    restart: unless-stopped
+    environment:
+      JWT_SECRET_KEY: super-secret-jwt-change-me
+      CELERY_BROKER: amqp://appuser:apppass@rabbitmq:5672//
+      CELERY_BACKEND: redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5555:5555"
+    command: ["celery", "-A", "app:celery", "flower", "--port=5555"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: flask-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: appuser
+      RABBITMQ_DEFAULT_PASS: apppass
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"     # AMQP 协议
+      - "15672:15672"   # 管理界面
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: flask-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - flower
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+  report_files:
+
