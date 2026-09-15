@@ -5,7 +5,7 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity,
 )
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import User, Role, EncryptTask
 from app.utils.idempotent import try_acquire
 from app.utils.auth import require_role
@@ -30,6 +30,7 @@ task_list_query_schema = TaskListQuerySchema()
 
 # ==================== 认证 ====================
 @api_bp.route("/auth/register", methods=["POST"])
+@limiter.limit("3/minute")
 def register():
     data = register_schema.load(request.get_json() or {})     # ← 校验 + 默认值
 
@@ -52,6 +53,7 @@ def register():
 
 
 @api_bp.route("/auth/login", methods=["POST"])
+@limiter.limit("5/minute")
 def login():
     data = login_schema.load(request.get_json() or {})
     user = User.query.filter_by(username=data["username"]).first()
@@ -85,6 +87,7 @@ def me():
 # ==================== 加密任务 ====================
 @api_bp.route("/encrypt", methods=["POST"])
 @jwt_required()
+@limiter.limit("3/minute")
 def submit_encrypt():
     data = encrypt_submit_schema.load(request.get_json() or {})
     uid = int(get_jwt_identity())

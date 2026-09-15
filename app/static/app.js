@@ -33,6 +33,44 @@ createApp({
       user.value?.roles?.includes("admin")
     );
 
+    const wsConnected = ref(false);
+    let socket = null;
+    const connectSocket = () => {
+      socket = io("/", {
+        transports: ["websocket", "polling"],
+        path: "/socket.io",
+      });
+      socket.on("connect", () => {
+        console.log("WebSocket connected:", socket.id);
+        wsConnected.value = true;
+      });
+      socket.on("disconnect", () => {
+        console.log("WebSocket disconnected");
+        wsConnected.value = false;
+      });
+      socket.on("report_progress", (data) => {
+        console.log("进度更新:", data);
+
+        const report = reports.value.find((r) => r.id === data.report_id);
+        if (report) {
+          report.progress = data.progress;
+          report.progressStatus = data.status;
+        }
+
+        if (data.progress === 100) {
+          showToast(`报告已生成（${data.message}）`);
+          setTimeout(loadReports, 500);
+
+        } else if (data.status === "failed") {
+          showToast(`报告生成失败：${data.message}`);
+        }
+      });
+    };
+
+    const disconnectSocket = () => {
+      if (socket) socket.disconnect();
+    };
+
     const statusText = (s) => ({
       draft: "草稿",
       pending_review: "待审核",
@@ -141,6 +179,7 @@ createApp({
         window.location.href = "/login";
         return;
       }
+      connectSocket();
       loadReports();
     });
 

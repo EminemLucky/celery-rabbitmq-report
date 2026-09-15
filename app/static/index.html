@@ -10,6 +10,11 @@
 <body>
   <div id="app">
     <!-- 顶栏 -->
+    <div class="user">
+      <span class="ws-status" :class="wsConnected ? 'on' : 'off'"></span>
+      <span>{{ user?.username }}（{{ user?.roles?.join(', ') }}）</span>
+      <button class="link" @click="logout">退出</button>
+    </div>
     <header class="topbar">
       <div class="logo">可靠性报告管理系统</div>
       <div class="user">
@@ -67,7 +72,10 @@
               <td>{{ r.report_no }}</td>
               <td>{{ r.title }}</td>
               <td>
-                <span class="badge" :class="'status-' + r.status">
+                <span v-if="r.progress !== undefined && r.progress < 100" class="badge status-generating">
+                  生成中 {{ r.progress }}%
+                </span>
+                <span v-else class="badge" :class="'status-' + r.status">
                   {{ statusText(r.status) }}
                 </span>
               </td>
@@ -115,7 +123,7 @@
 
     <div class="toast" v-if="toast">{{ toast }}</div>
   </div>
-
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

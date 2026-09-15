@@ -12,6 +12,7 @@ def app():
         "CELERY_TASK_ALWAYS_EAGER": True,
         "CELERY_TASK_EAGER_PROPAGATES": True,
         "JWT_SECRET_KEY": "test-secret-key-at-least-32-bytes-long-000",
+        "RATELIMIT_ENABLED": False,
     })
 
     print("TEST ENGINE_OPTIONS:", app.config["SQLALCHEMY_ENGINE_OPTIONS"])  # ← 加这行
@@ -50,3 +51,4 @@ def register_and_login(client):
         data = r.get_json()
         return data["access_token"], data["refresh_token"], data["user"]
     return _do
+

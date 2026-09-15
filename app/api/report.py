@@ -2,7 +2,7 @@ import uuid
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Report, ReportVersion
 from app.schemas import (
     ReportSubmitSchema, ReportSchema, ReportVersionSchema, ReportListQuerySchema,
@@ -26,6 +26,7 @@ list_query_schema = ReportListQuerySchema()
 
 @report_bp.route("", methods=["POST"])
 @jwt_required()
+@limiter.limit("30/minute")
 def submit_report():
     data = submit_schema.load(request.get_json() or {})
     uid = int(get_jwt_identity())
@@ -175,6 +176,7 @@ def regenerate(report_id):
 
 @report_bp.route("/batch-export", methods=["POST"])
 @jwt_required()
+@limiter.limit("10/minute")
 def batch_export():
     """批量导出报告，返回 ZIP"""
     data = request.get_json() or {}

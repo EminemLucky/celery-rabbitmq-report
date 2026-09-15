@@ -4,7 +4,8 @@ from flask import Flask, jsonify
 from celery import Celery
 from kombu import Queue
 from celery.schedules import crontab
-from app.extensions import db, jwt, migrate
+from app.extensions import db, jwt, migrate, limiter, socketio
+from flask_limiter.errors import RateLimitExceeded
 
 logging.basicConfig(level=logging.INFO)
 
@@ -89,6 +90,9 @@ def create_app(config_override=None):
     if config_override:
         app.config.update(config_override)
 
+    if app.config.get("TESTING"):
+        limiter.enabled = False
+
     if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
 
@@ -97,6 +101,13 @@ def create_app(config_override=None):
     migrate.init_app(app, db)
 
     _flask_app = app
+
+    @app.errorhandler(RateLimitExceeded)
+    def handle_rate_limit(e):
+        return jsonify({
+            "error": "rate limit exceeded",
+            "detail": str(e.description),
+        }), 429
 
     from app.routes import api_bp
     app.register_blueprint(api_bp, url_prefix="/api")
@@ -120,6 +131,10 @@ def create_app(config_override=None):
     @app.cli.command("init-roles")
     def init_roles_command():
         ...
+
+    limiter.init_app(app)
+    socketio.init_app(app)
+
     return app
 
 
