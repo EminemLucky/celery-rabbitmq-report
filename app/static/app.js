@@ -144,11 +144,50 @@ createApp({
       loadReports();
     });
 
+    const selectedIds = ref([]);
+
+const allSelected = computed(() =>
+  reports.value.length > 0 && selectedIds.value.length === reports.value.length
+);
+
+const toggleAll = (e) => {
+  if (e.target.checked) {
+    selectedIds.value = reports.value.map((r) => r.id);
+  } else {
+    selectedIds.value = [];
+  }
+};
+
+const batchExport = async () => {
+  if (selectedIds.value.length === 0) {
+    return showToast("请先勾选报告");
+  }
+  try {
+    const res = await axios.post(
+      "/api/report/batch-export",
+      { report_ids: selectedIds.value },
+      { responseType: "blob" }
+    );
+
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reports_${Date.now()}.zip`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    showToast("导出成功");
+  } catch (e) {
+    showToast("导出失败：" + e.message);
+  }
+};
+
     return {
       user, isAdmin, reports, versions, detail, loading, submitting,
       form, toast,
       statusText, loadReports, submitReport, openDetail,
       approve, archive, regenerate, download, logout,
+      selectedIds, allSelected, toggleAll, batchExport,
     };
   },
 }).mount("#app");

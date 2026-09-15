@@ -38,6 +38,9 @@
         <div class="card-header">
           <h2>我的报告</h2>
           <button class="link" @click="loadReports">刷新</button>
+          <button class="primary" style="width: auto; padding: 6px 12px;" @click="batchExport">
+      批量导出
+    </button>
         </div>
 
         <div v-if="loading" class="muted">加载中...</div>
@@ -46,6 +49,7 @@
         <table v-else class="table">
           <thead>
             <tr>
+              <th><input type="checkbox" @change="toggleAll" :checked="allSelected" /></th>
               <th>ID</th>
               <th>报告编号</th>
               <th>标题</th>
@@ -56,6 +60,9 @@
           </thead>
           <tbody>
             <tr v-for="r in reports" :key="r.id">
+              <td>
+                  <input type="checkbox" :value="r.id" v-model="selectedIds" />
+              </td>
               <td>{{ r.id }}</td>
               <td>{{ r.report_no }}</td>
               <td>{{ r.title }}</td>

@@ -1,3 +1,5 @@
+![CI](https://github.com/EminemLucky/celery-rabbitmq-report/actions/workflows/ci.yml/badge.svg)
+
 # 可靠性报告管理系统（Flask + Celery + RabbitMQ）
 
 基于 Flask + Celery + RabbitMQ + MySQL 构建的**异步任务 + 报告管理**系统。支持用户认证（JWT 双 token）、RBAC 权限控制、AES 加密任务、多队列异步处理、报告编制/审核/归档全流程、报告版本控制、Excel/PDF 生成、Flower 监控、Nginx 反向代理、Docker Compose 一键部署。

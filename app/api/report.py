@@ -9,6 +9,10 @@ from app.schemas import (
 )
 from app.utils.auth import require_role
 from app.celery_tasks.report_tasks import generate_report
+import os
+import io
+import zipfile
+from flask import send_file
 
 report_bp = Blueprint("report", __name__)
 
@@ -168,3 +172,50 @@ def regenerate(report_id):
         queue="normal",
     )
     return jsonify({"report_id": report_id, "status": "regenerating"}), 202
+
+@report_bp.route("/batch-export", methods=["POST"])
+@jwt_required()
+def batch_export():
+    """批量导出报告，返回 ZIP"""
+    data = request.get_json() or {}
+    report_ids = data.get("report_ids") or []
+
+    if not report_ids:
+        return jsonify({"error": "report_ids is required"}), 400
+
+    uid = int(get_jwt_identity())
+
+    # 只导出当前用户的报告
+    reports = Report.query.filter(
+        Report.id.in_(report_ids),
+        Report.user_id == uid,
+    ).all()
+
+    if not reports:
+        return jsonify({"error": "no reports found"}), 404
+
+    # 内存里打包 ZIP
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
+        for report in reports:
+            # 取最新版本的文件
+            version = (
+                ReportVersion.query
+                .filter_by(report_id=report.id)
+                .order_by(ReportVersion.id.desc())
+                .first()
+            )
+            if version and os.path.exists(version.file_path):
+                # ZIP 里文件名：报告编号_版本.扩展名
+                ext = version.file_type
+                arcname = f"{report.report_no}_{version.version}.{ext}"
+                zf.write(version.file_path, arcname)
+
+    memory_file.seek(0)
+
+    return send_file(
+        memory_file,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"reports_{uid}.zip",
+    )
