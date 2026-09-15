@@ -4,10 +4,10 @@ services:
     container_name: flask-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: reportdb
       MYSQL_USER: appuser
-      MYSQL_PASSWORD: apppass
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
